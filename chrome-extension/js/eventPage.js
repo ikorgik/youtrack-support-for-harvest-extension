@@ -116,7 +116,7 @@ function ($, api, utils) {
           }
           // if no such entry add new
           var ytEntry = data.filter(function (ytEntry) {
-            return ~(ytEntry.description || '').indexOf(entry.id)
+            return ~(ytEntry.text || '').indexOf(entry.id)
           })[0]
 
           var _addOrEdit = function (ytEntryId) {

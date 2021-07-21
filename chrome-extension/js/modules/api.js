@@ -51,7 +51,7 @@ function ($, utils) {
     }.bind(youtrack),
     getAll: function (issueId, success, error) {
       $.ajax({
-        url: this.url(issueId),
+        url: this.url(issueId) + '?fields=text,id',
         headers: {
           accept: 'application/json',
           authorization: 'Bearer ' + youtrack.auth
