@@ -107,10 +107,12 @@ function ($, api, utils) {
         api.youtrack.workItem.getAll(issueId, function (data) { // TODO possibly cache issueId
           ytLoginAttempt = false
           var workData = {
+            text: importedStr + '; (' + entry.id + ')',
             date: +new Date(entry.spent_at),
-            duration: (entry.hours * 60).toFixed(),
-            description: importedStr + '; (' + entry.id + ')',
-            worktype: {name: entry.task}
+            duration: {
+              minutes: parseInt((entry.hours * 60).toFixed())
+            },
+            // worktype: {name: entry.task} // @todo: add worktype support.
           }
           // if no such entry add new
           var ytEntry = data.filter(function (ytEntry) {

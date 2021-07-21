@@ -26,7 +26,7 @@
         var configScript, ph, platformConfig, platformScript;
         platformConfig = {
           applicationName: "Youtrack",
-          permalink: "https://%ACCOUNT_ID%.myjetbrains.com/youtrack/issue/%PROJECT_ID%-%ITEM_ID%"
+          permalink: "https://%ACCOUNT_ID%.myjetbrains.com/youtrack/issues/%PROJECT_ID%-%ITEM_ID%"
         };
         configScript = document.createElement("script");
         configScript.innerHTML = "window._harvestPlatformConfig = " + (JSON.stringify(platformConfig)) + ";";

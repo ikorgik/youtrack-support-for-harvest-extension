@@ -1,7 +1,10 @@
 define(['jquery', 'utils'],
 function ($, utils) {
   var youtrack = {
-    url: utils._f
+    url: utils._f,
+    auth: '' // @todo: Add an interface to add token
+    // see: https://www.jetbrains.com/help/youtrack/devportal/Manage-Permanent-Token.html
+    // see: https://www.jetbrains.com/help/youtrack/devportal/authentication-with-permanent-token.html
   }
 
   var harvest = {
@@ -11,7 +14,7 @@ function ($, utils) {
 
   function reInitOptions (cb) {
     chrome.storage.sync.get(['youtrack_url', 'harvest_url', 'harvest_login', 'harvest_password'], function (data) {
-      youtrack.url = function (clean) { return data.youtrack_url + (clean ? '' : '/rest/') }
+      youtrack.url = function (clean) { return data.youtrack_url + (clean ? '' : '/api/') }
       harvest.url = function () { return data.harvest_url }
       harvest.auth = function () { return btoa(data.harvest_login + ':' + data.harvest_password) }
 
@@ -27,38 +30,50 @@ function ($, utils) {
   // used to check YT url
   youtrack.projectIds = {
       url: function () {
-        return this.url() + 'admin/project/'
+        return this.url() + 'admin/projects/'
       }.bind(youtrack),
       get: function (success, error) {
         $.ajax({
           url: this.url(),
+          headers: {
+            accept: 'application/json',
+            authorization: 'Bearer ' + youtrack.auth
+          },
           success: success,
           error: error,
-          dataType: 'json'
+          dataType: 'json',
         })
       }
   }
   youtrack.workItem = {
     url: function (issueId) {
-      return this.url() + 'issue/%issue_id%/timetracking/workitem/'.replace('%issue_id%', issueId)
+      return this.url() + 'issues/%issue_id%/timeTracking/workItems/'.replace('%issue_id%', issueId)
     }.bind(youtrack),
     getAll: function (issueId, success, error) {
       $.ajax({
         url: this.url(issueId),
+        headers: {
+          accept: 'application/json',
+          authorization: 'Bearer ' + youtrack.auth
+        },
         dataType: 'json',
         success: success,
-        error: error
+        error: error,
       })
     },
     editOrAdd: function (issueId, itemId, data, success, error) {
       $.ajax({
         url: this.url(issueId) + (itemId || ''),
+        headers: {
+          accept: 'application/json',
+          authorization: 'Bearer ' + youtrack.auth
+        },
         method: itemId ? "PUT" : "POST",
         success: success,
         error: error,
         data: JSON.stringify(data),
         dataType: 'json',
-        contentType: 'application/json'
+        contentType: 'application/json',
       })
     }
   }
