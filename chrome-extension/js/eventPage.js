@@ -79,96 +79,105 @@ function ($, api, utils) {
         }
         return
       }
-      data.forEach(function (entry) {
-        var issueId = (entry.notes || '').match(/^([A-Z]+-\d+)/)
-        if (!issueId) { return } // not YT entry
+      data.forEach(function (entry, index) {
 
-        issueId = issueId[1]
-
-        var checkingIdKey = checkInProgress.indexOf(entry.id)
-        if (checkingIdKey) {
-          delete checkInProgress[checkingIdKey]
-          if (!checkInProgress.join('')) {
-            checkInProgress = []
-          }
-        }
-
-        if (entry.timer_started_at) { // unfinished
-          if (!checkInProgress.includes(entry.id))
-            checkInProgress.push(entry.id)
-          chrome.alarms.get('checkInProgress', function (alarm) {
-            if (!alarm) {
-              chrome.alarms.create('checkInProgress', {delayInMinutes: 10})
-            }
-            updateTitle()
-          })
-        }
-
-        api.youtrack.workItem.getAll(issueId, function (data) { // TODO possibly cache issueId
-          ytLoginAttempt = false
-          var workData = {
-            text: importedStr + '; (' + entry.id + ')',
-            date: +new Date(entry.spent_at),
-            duration: {
-              minutes: parseInt((entry.hours * 60).toFixed())
-            },
-            // worktype: {name: entry.task} // @todo: add worktype support.
-          }
-          // if no such entry add new
-          var ytEntry = data.filter(function (ytEntry) {
-            return ~(ytEntry.text || '').indexOf(entry.id)
-          })[0]
-
-          var _addOrEdit = function (ytEntryId) {
-            api.youtrack.workItem.editOrAdd(issueId, ytEntryId, workData, null, function (xhr) {
-              if (xhr.status >= 200 && xhr.status < 300 || xhr.status == 304) {
-                return // JSON parse error, actual success
-              }
-              var data = xhr.responseJSON || {}
-              // TODO there is possibility to know which workTypes are present on the server -
-              // - may be useful to cache available projects and worktypes
-              // if no worktype - add w/o it
-              if (xhr.status == 400 && data.value == "Worktype [" + workData.worktype.name + "] is not attached to project.") {
-                delete workData.worktype
-                api.youtrack.workItem.editOrAdd(issueId, ytEntryId, workData, null, function () {
-                  addOfflineAlarm(workData.date) // TODO no need to make request with worktype again
-                })
-              } else {
-                addOfflineAlarm(workData.date)
-              }
-
-            })
-          }
-
-          if (ytEntry) {
-            if (ytEntry.duration != workData.duration) {
-              _addOrEdit(ytEntry.id)
-            }
-          } else {
-            _addOrEdit()
-          }
-        }, function (xhr) {
-          switch (xhr.status) {
-            case 403:
-              if (ytLoginAttempt || $('iframe.yt-relogin').length) { return }
-              ytLoginAttempt = true
-              $('<iframe class="yt-relogin">').appendTo('body').one('load', function () {
-                setTimeout(function () { $(this).remove() }.bind(this), 3e4)
-              }).attr('src', api.youtrack.url(true))
-              addOfflineAlarm(date, 1)
-              break;
-            case 404: // TODO issue id is not found / have not access
-              break;
-            default:
-              addOfflineAlarm(date)
-          }
-        })
+        // Set the delay between update requests, otherwise "Spent time" calculated wrongly.
+        // @todo: enhance functionality.
+        setTimeout(function () {
+          processEntry(entry);
+        }, index * 300);
       })
 
     }, function () { // TODO count errors, on 10 - show red icon ?
       addOfflineAlarm(date, 2) // if offline than we won't spam any server, since this is the first request
     })
 
+  }
+
+  function processEntry(entry) {
+    var issueId = (entry.notes || '').match(/^([A-Z]+-\d+)/)
+    if (!issueId) { return } // not YT entry
+
+    issueId = issueId[1]
+
+    var checkingIdKey = checkInProgress.indexOf(entry.id)
+    if (checkingIdKey) {
+      delete checkInProgress[checkingIdKey]
+      if (!checkInProgress.join('')) {
+        checkInProgress = []
+      }
+    }
+
+    if (entry.timer_started_at) { // unfinished
+      if (!checkInProgress.includes(entry.id))
+        checkInProgress.push(entry.id)
+      chrome.alarms.get('checkInProgress', function (alarm) {
+        if (!alarm) {
+          chrome.alarms.create('checkInProgress', {delayInMinutes: 10})
+        }
+        updateTitle()
+      })
+    }
+
+    api.youtrack.workItem.getAll(issueId, function (data) { // TODO possibly cache issueId
+      ytLoginAttempt = false
+      var workData = {
+        text: importedStr + '; (' + entry.id + ')',
+        date: +new Date(entry.spent_at),
+        duration: {
+          minutes: parseInt((entry.hours * 60).toFixed())
+        },
+        // worktype: {name: entry.task} // @todo: add worktype support.
+      }
+      // if no such entry add new
+      var ytEntry = data.filter(function (ytEntry) {
+        return ~(ytEntry.text || '').indexOf(entry.id)
+      })[0]
+
+      var _addOrEdit = function (ytEntryId) {
+        api.youtrack.workItem.editOrAdd(issueId, ytEntryId, workData, null, function (xhr) {
+          if (xhr.status >= 200 && xhr.status < 300 || xhr.status == 304) {
+            return // JSON parse error, actual success
+          }
+          var data = xhr.responseJSON || {}
+          // TODO there is possibility to know which workTypes are present on the server -
+          // - may be useful to cache available projects and worktypes
+          // if no worktype - add w/o it
+          if (xhr.status == 400 && data.value == "Worktype [" + workData.worktype.name + "] is not attached to project.") {
+            delete workData.worktype
+            api.youtrack.workItem.editOrAdd(issueId, ytEntryId, workData, null, function () {
+              addOfflineAlarm(workData.date) // TODO no need to make request with worktype again
+            })
+          } else {
+            addOfflineAlarm(workData.date)
+          }
+
+        })
+      }
+
+      if (ytEntry) {
+        if (ytEntry.duration != workData.duration) {
+          _addOrEdit(ytEntry.id)
+        }
+      } else {
+        _addOrEdit()
+      }
+    }, function (xhr) {
+      switch (xhr.status) {
+        case 403:
+          if (ytLoginAttempt || $('iframe.yt-relogin').length) { return }
+          ytLoginAttempt = true
+          $('<iframe class="yt-relogin">').appendTo('body').one('load', function () {
+            setTimeout(function () { $(this).remove() }.bind(this), 3e4)
+          }).attr('src', api.youtrack.url(true))
+          addOfflineAlarm(date, 1)
+          break;
+        case 404: // TODO issue id is not found / have not access
+          break;
+        default:
+          addOfflineAlarm(date)
+      }
+    })
   }
 
   function updateTitle() {
